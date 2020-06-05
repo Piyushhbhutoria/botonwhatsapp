@@ -7,7 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/PiyushhBhutoria/whatsappBot/config"
+	"github.com/PiyushhBhutoria/botonwhatsapp/config"
 )
 
 func createPayload(reqPayload interface{}) (payload []byte, err error) {

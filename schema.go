@@ -2,6 +2,7 @@ package main
 
 import "github.com/Rhymen/go-whatsapp"
 
+// Payload struct
 type Payload struct {
 	Message payloadData `json:"message"`
 }
@@ -12,6 +13,7 @@ type payloadData struct {
 	ConversationID string `json:"conversation_id"`
 }
 
+// SendText struct
 type SendText struct {
 	Receiver string `json:"to"`
 	Message  string `json:"text"`
