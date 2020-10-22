@@ -1,35 +1,23 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/PiyushhBhutoria/botonwhatsapp/config"
 )
 
-func createPayload(reqPayload interface{}) (payload []byte, err error) {
-	typePayload := reqPayload.(Payload)
-	payload, err = json.Marshal(typePayload)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func postRequest(endpoint string, payload []byte) (string, error) {
+func postRequest(payload *strings.Reader) (string, error) {
 	config := config.GetConfig()
-	fmt.Println("payload ->", string(payload))
-	req, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(payload))
+	fmt.Println("payload ->", *payload)
+	req, err := http.NewRequest("POST", sapEndpoint, payload)
 	if err != nil {
 		return "", err
 	}
 	req.Header.Add("Authorization", config.GetString("SAP"))
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Cache-Control", "no-cache")
-	req.Header.Add("Host", "api.cai.tools.sap")
 
 	client := &http.Client{}
 	res, err := client.Do(req)

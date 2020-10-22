@@ -11,11 +11,10 @@ import (
 
 func (*waHandler) HandleTextMessage(message whatsapp.TextMessage) {
 	// if message.Info.Timestamp > uint64(now) && !message.Info.FromMe && len(message.Text) < 17 && len(message.Text) > 1 {
-	if message.Info.Timestamp > uint64(now) && message.Info.FromMe && !strings.Contains(message.Text, "@g.us") && len(message.Text) < 21 {
+	if message.Info.Timestamp > uint64(now) && !message.Info.FromMe && !strings.Contains(message.Text, "@g.us") && len(message.Text) < 21 {
 		fmt.Printf("Received %s from %s\n", message.Text, message.Info.SenderJid)
 		requestChannel <- message
 	}
-	// }
 }
 
 func (h *waHandler) HandleError(err error) {

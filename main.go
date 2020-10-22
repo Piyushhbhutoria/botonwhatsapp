@@ -13,9 +13,7 @@ import (
 
 	"github.com/PiyushhBhutoria/botonwhatsapp/config"
 	"github.com/Rhymen/go-whatsapp"
-	"github.com/getsentry/raven-go"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sentry"
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,12 +26,9 @@ var (
 
 func init() {
 	config.Init("config")
-	config := config.GetConfig()
 
 	fmt.Println("for session issue  remove whatsapp.gob from --> " + os.TempDir())
 	fmt.Println("running on " + strconv.Itoa(runtime.NumCPU()) + " cores.")
-
-	raven.SetDSN(config.GetString("sentry"))
 
 	requestChannel = make(chan whatsapp.TextMessage, runtime.NumCPU())
 
@@ -54,17 +49,9 @@ func main() {
 		for {
 			request, ok := <-requestChannel
 			if ok {
-				payload, err := createPayload(Payload{
-					Message: payloadData{
-						Content:        request.Text,
-						Type:           "text",
-						ConversationID: request.Info.RemoteJid[2:12],
-					},
-				})
-				if err != nil {
-					log.Printf("Error creating payload: %v\n", err)
-				}
-				data, err := postRequest(sapEndpoint, payload)
+				payload := strings.NewReader(`{"message": {"content":"` + request.Text + `","type":"text"}, "conversation_id": "` + request.Info.RemoteJid[2:12] + `"}`)
+
+				data, err := postRequest(payload)
 				if err != nil {
 					log.Printf("Error in post request: %v\n", err)
 				}
@@ -100,7 +87,6 @@ func main() {
 			param.ErrorMessage,
 		)
 	}))
-	router.Use(sentry.Recovery(raven.DefaultClient, true))
 	router.Use(cors.Default())
 
 	router.GET("/", helloworld)
