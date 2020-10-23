@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/PiyushhBhutoria/botonwhatsapp/config"
+	"github.com/Piyushhbhutoria/botonwhatsapp/config"
 )
 
 func postRequest(payload *strings.Reader) (string, error) {

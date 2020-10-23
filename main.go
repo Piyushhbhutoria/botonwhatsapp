@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PiyushhBhutoria/botonwhatsapp/config"
+	"github.com/Piyushhbhutoria/botonwhatsapp/config"
 	"github.com/Rhymen/go-whatsapp"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
