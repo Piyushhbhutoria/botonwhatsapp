@@ -1,135 +1,72 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
-	"runtime"
-	"strconv"
-	"strings"
-	"time"
+	"os/signal"
+	"syscall"
 
-	"github.com/Piyushhbhutoria/botonwhatsapp/config"
-	"github.com/Rhymen/go-whatsapp"
-	"github.com/gin-contrib/cors"
-	"github.com/gin-gonic/gin"
+	_ "github.com/mattn/go-sqlite3"
+	qrterminal "github.com/mdp/qrterminal/v3"
+	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types/events"
+	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
-var (
-	requestChannel chan whatsapp.TextMessage
-	wac, _         = whatsapp.NewConn(20 * time.Second)
-	now            = time.Now().Unix()
-	sapEndpoint    = "https://api.cai.tools.sap/build/v1/dialog"
-)
-
-func init() {
-	config.Init("config")
-
-	fmt.Println("for session issue  remove whatsapp.gob from --> " + os.TempDir())
-	fmt.Println("running on " + strconv.Itoa(runtime.NumCPU()) + " cores.")
-
-	requestChannel = make(chan whatsapp.TextMessage, runtime.NumCPU())
-
-	wac.SetClientVersion(2, 2021, 4)
-	wac.AddHandler(&waHandler{wac})
-	if err := login(wac); err != nil {
-		panic("Error logging in: \n" + err.Error())
+func eventHandler(evt interface{}) {
+	switch v := evt.(type) {
+	case *events.Message:
+		fmt.Println("Received a message!", v.Message.GetConversation())
 	}
-
-	<-time.After(3 * time.Second)
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	var temp resp
+	dbLog := waLog.Stdout("Database", "DEBUG", true)
+	container, err := sqlstore.New("sqlite3", "file:examplestore.db?_foreign_keys=on", dbLog)
+	if err != nil {
+		panic(err)
+	}
+	// If you want multiple sessions, remember their JIDs and use .GetDevice(jid) or .GetAllDevices() instead.
+	deviceStore, err := container.GetFirstDevice()
+	if err != nil {
+		panic(err)
+	}
+	clientLog := waLog.Stdout("Client", "DEBUG", true)
+	client := whatsmeow.NewClient(deviceStore, clientLog)
+	client.AddEventHandler(eventHandler)
 
-	go func() {
-		for {
-			request, ok := <-requestChannel
-			if ok {
-				payload := strings.NewReader(`{"message": {"content":"` + request.Text + `","type":"text"}, "conversation_id": "` + request.Info.RemoteJid[2:12] + `"}`)
-
-				data, err := postRequest(payload)
-				if err != nil {
-					log.Printf("Error in post request: %v\n", err)
-				}
-
-				err = json.Unmarshal([]byte(data), &temp)
-				if err != nil {
-					log.Printf("Error decoding body: %v\n", err)
-				}
-
-				if len(temp.Results.Messages) > 0 && temp.Results.Messages[0].Content != "I trigger the fallback skill because I don't understand or I don't know what I'm supposed to do..." {
-					fmt.Println(temp.Results.Messages[0].Content)
-					to := request.Info.RemoteJid[2:12]
-					mess := temp.Results.Messages[0].Content
-					log.Printf("%v --> %s\nBot --> %v", to, request.Text, mess)
-					log.Printf("-------------------------------")
-					fmt.Println(texting(to, mess))
-				}
+	if client.Store.ID == nil {
+		// No ID stored, new login
+		qrChan, _ := client.GetQRChannel(context.Background())
+		err = client.Connect()
+		if err != nil {
+			panic(err)
+		}
+		for evt := range qrChan {
+			if evt.Event == "code" {
+				// Render the QR code here
+				// e.g. qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
+				// or just manually `echo 2@... | qrencode -t ansiutf8` in a terminal
+				fmt.Println("QR code:", evt.Code)
+				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
+			} else {
+				fmt.Println("Login event:", evt.Event)
 			}
 		}
-	}()
-
-	gin.SetMode(gin.ReleaseMode)
-
-	router := gin.New()
-	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		return fmt.Sprintf("[%s] \"%s %s %s %d %s %s\"\n",
-			param.TimeStamp.Format(time.RFC1123),
-			param.Method,
-			param.Path,
-			param.Request.Proto,
-			param.StatusCode,
-			param.Latency,
-			param.ErrorMessage,
-		)
-	}))
-	router.Use(cors.Default())
-
-	router.GET("/", helloworld)
-	router.GET("/ping", ping)
-	router.GET("/sendText", sendText)
-	router.POST("/sendBulk", sendBulk)
-
-	if err := router.Run(":8080"); err != nil {
-		log.Printf("Shutdown with error: %v\n", err)
-	}
-
-}
-
-func ping(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"message": "pong",
-	})
-}
-
-func helloworld(c *gin.Context) {
-	c.String(http.StatusOK, "The bot is running")
-}
-
-func sendText(c *gin.Context) {
-	to := strings.Replace(c.DefaultQuery("to", "1234567890"), " ", "", -1)
-	mess := c.DefaultQuery("msg", "testing")
-	c.String(http.StatusOK, texting(to, mess))
-}
-
-func sendBulk(c *gin.Context) {
-	var data sendBulkText
-	m := make(map[string]string)
-
-	if err := c.ShouldBindJSON(&data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	for _, each := range data.List {
-		each.Receiver = strings.Replace(each.Receiver, " ", "", -1)
-		if each.Receiver != "" {
-			m[each.Receiver] = texting(each.Receiver, each.Message)
+	} else {
+		// Already logged in, just connect
+		err = client.Connect()
+		if err != nil {
+			panic(err)
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"result": data})
+
+	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+
+	client.Disconnect()
 }
