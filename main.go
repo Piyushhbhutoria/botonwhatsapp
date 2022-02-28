@@ -1,72 +1,110 @@
 package main
 
 import (
+	"bufio"
 	"context"
-	"fmt"
+	"errors"
+	"flag"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	_ "github.com/mattn/go-sqlite3"
 	qrterminal "github.com/mdp/qrterminal/v3"
 	"go.mau.fi/whatsmeow"
+	waBinary "go.mau.fi/whatsmeow/binary"
 	"go.mau.fi/whatsmeow/store/sqlstore"
-	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
-func eventHandler(evt interface{}) {
-	switch v := evt.(type) {
-	case *events.Message:
-		fmt.Println("Received a message!", v.Message.GetConversation())
-	}
-}
+var (
+	cli      *whatsmeow.Client
+	logLevel = "INFO"
+)
+
+var debugLogs = flag.Bool("debug", false, "Enable debug logs?")
+var dbDialect = flag.String("db-dialect", "sqlite3", "Database dialect (sqlite3 or postgres)")
+var dbAddress = flag.String("db-address", "file:examplestore.db?_foreign_keys=on", "Database address")
 
 func main() {
-	dbLog := waLog.Stdout("Database", "DEBUG", true)
-	container, err := sqlstore.New("sqlite3", "file:examplestore.db?_foreign_keys=on", dbLog)
-	if err != nil {
-		panic(err)
-	}
-	// If you want multiple sessions, remember their JIDs and use .GetDevice(jid) or .GetAllDevices() instead.
-	deviceStore, err := container.GetFirstDevice()
-	if err != nil {
-		panic(err)
-	}
-	clientLog := waLog.Stdout("Client", "DEBUG", true)
-	client := whatsmeow.NewClient(deviceStore, clientLog)
-	client.AddEventHandler(eventHandler)
+	waBinary.IndentXML = true
+	flag.Parse()
 
-	if client.Store.ID == nil {
-		// No ID stored, new login
-		qrChan, _ := client.GetQRChannel(context.Background())
-		err = client.Connect()
-		if err != nil {
-			panic(err)
-		}
-		for evt := range qrChan {
-			if evt.Event == "code" {
-				// Render the QR code here
-				// e.g. qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-				// or just manually `echo 2@... | qrencode -t ansiutf8` in a terminal
-				fmt.Println("QR code:", evt.Code)
-				qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-			} else {
-				fmt.Println("Login event:", evt.Event)
-			}
+	if *debugLogs {
+		logLevel = "DEBUG"
+	}
+	log = waLog.Stdout("Main", logLevel, true)
+
+	dbLog := waLog.Stdout("Database", logLevel, true)
+	storeContainer, err := sqlstore.New(*dbDialect, *dbAddress, dbLog)
+	if err != nil {
+		log.Errorf("Failed to connect to database: %v", err)
+		return
+	}
+	device, err := storeContainer.GetFirstDevice()
+	if err != nil {
+		log.Errorf("Failed to get device: %v", err)
+		return
+	}
+
+	cli = whatsmeow.NewClient(device, waLog.Stdout("Client", logLevel, true))
+
+	ch, err := cli.GetQRChannel(context.Background())
+	if err != nil {
+		// This error means that we're already logged in, so ignore it.
+		if !errors.Is(err, whatsmeow.ErrQRStoreContainsID) {
+			log.Errorf("Failed to get QR channel: %v", err)
 		}
 	} else {
-		// Already logged in, just connect
-		err = client.Connect()
-		if err != nil {
-			panic(err)
-		}
+		go func() {
+			for evt := range ch {
+				if evt.Event == "code" {
+					qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
+				} else {
+					log.Infof("QR channel result: %s", evt.Event)
+				}
+			}
+		}()
 	}
 
-	// Listen to Ctrl+C (you can also do something else that prevents the program from exiting)
-	c := make(chan os.Signal)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	<-c
+	cli.AddEventHandler(handler)
+	err = cli.Connect()
+	if err != nil {
+		log.Errorf("Failed to connect: %v", err)
+		return
+	}
 
-	client.Disconnect()
+	c := make(chan os.Signal)
+	input := make(chan string)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		defer close(input)
+		scan := bufio.NewScanner(os.Stdin)
+		for scan.Scan() {
+			line := strings.TrimSpace(scan.Text())
+			if len(line) > 0 {
+				input <- line
+			}
+		}
+	}()
+
+	for {
+		select {
+		case <-c:
+			log.Infof("Interrupt received, exiting")
+			cli.Disconnect()
+			return
+		case cmd := <-input:
+			if len(cmd) == 0 {
+				log.Infof("Stdin closed, exiting")
+				cli.Disconnect()
+				return
+			}
+			args := strings.Fields(cmd)
+			cmd = args[0]
+			args = args[1:]
+			go handleCmd(strings.ToLower(cmd), args)
+		}
+	}
 }
