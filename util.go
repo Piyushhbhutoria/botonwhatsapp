@@ -12,7 +12,7 @@ import (
 func postRequest(payload *strings.Reader) (string, error) {
 	config := config.GetConfig()
 	fmt.Println("payload ->", *payload)
-	sapEndpoint := "https://api.cai.tools.sap"
+	sapEndpoint := "https://api.cai.tools.sap/build/v1/dialog"
 	req, err := http.NewRequest("POST", sapEndpoint, payload)
 	if err != nil {
 		return "", err

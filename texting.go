@@ -7,7 +7,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func text(args []string) {
+func texting(args []string) {
 	recipient, ok := parseJID(args[0])
 	if !ok {
 		return

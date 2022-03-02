@@ -218,7 +218,7 @@ func handleCmd(cmd string, args []string) {
 			log.Errorf("Usage: send <jid> <text>")
 			return
 		}
-		text(args)
+		texting(args)
 	case "sendbulk":
 		if len(args) < 1 {
 			log.Errorf("Usage: sendbulk <csv file>")
@@ -240,7 +240,7 @@ func handleCmd(cmd string, args []string) {
 
 		for _, each := range csvData {
 			if each[0] != "" {
-				text(each)
+				texting(each)
 			}
 		}
 	case "sendimg":

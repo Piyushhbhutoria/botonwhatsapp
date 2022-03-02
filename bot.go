@@ -34,6 +34,6 @@ func reply(evt *events.Message) {
 		log.Infof("%v --> %s\nBot --> %v", to, message, reply)
 		log.Infof("-------------------------------")
 		// args := []string{"send", to, reply}
-		// text(args)
+		// texting(args)
 	}
 }
