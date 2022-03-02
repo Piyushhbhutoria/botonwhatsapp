@@ -7,6 +7,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 
@@ -28,6 +29,7 @@ var dbDialect = flag.String("db-dialect", "sqlite3", "Database dialect (sqlite3 
 var dbAddress = flag.String("db-address", "file:examplestore.db?_foreign_keys=on", "Database address")
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	waBinary.IndentXML = true
 	flag.Parse()
 

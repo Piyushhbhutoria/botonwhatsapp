@@ -62,6 +62,8 @@ func handler(rawEvt interface{}) {
 
 			log.Infof("Received message %s from %s (%s): %s", evt.Info.ID, evt.Info.SourceString(), strings.Join(metaParts, ", "), evt.Message.GetConversation())
 
+			reply(evt)
+
 			if !strings.Contains(evt.Message.GetConversation(), "status@broadcast") {
 				img := evt.Message.GetImageMessage()
 				if img != nil {
