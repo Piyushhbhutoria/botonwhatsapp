@@ -1,3 +1,8 @@
-config/config.yaml
 .DS_Store
-tmp
+*.gob
+*.log
+botonwhatsapp
+examplestore.db
+vendor
+history-*
+.env
