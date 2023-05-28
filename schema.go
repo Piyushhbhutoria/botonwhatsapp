@@ -1,18 +1,5 @@
 package main
 
-import "github.com/Rhymen/go-whatsapp"
-
-// Payload struct
-type Payload struct {
-	Message payloadData `json:"message"`
-}
-
-type payloadData struct {
-	Content        string `json:"content"`
-	Type           string `json:"type"`
-	ConversationID string `json:"conversation_id"`
-}
-
 // SendText struct
 type SendText struct {
 	Receiver string `json:"to"`
@@ -21,10 +8,6 @@ type SendText struct {
 
 type sendBulkText struct {
 	List []SendText `json:"list"`
-}
-
-type waHandler struct {
-	c *whatsapp.Conn
 }
 
 type resp struct {
