@@ -16,7 +16,7 @@ const (
 )
 
 func askBot(evt *events.Message) (*resp, error) {
-	payload := strings.NewReader(`{"message": {"content":"` + evt.Message.GetConversation() + `","type":"text"}, "conversation_id": "` + evt.Info.SourceString() + `"}`)
+	payload := strings.NewReader(`{"message": {"content":"` + evt.Message.GetConversation() + `","type":"text"}, "conversation_id": "` + evt.Info.Sender.User + `"}`)
 	fmt.Println("payload ->", *payload)
 
 	req, err := http.NewRequest("POST", sapEndpoint, payload)

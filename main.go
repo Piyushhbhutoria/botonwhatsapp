@@ -125,7 +125,7 @@ func main() {
 				if len(temp.Results.Messages) > 0 && temp.Results.Messages[0].Content != "I trigger the fallback skill because I don't understand or I don't know what I'm supposed to do..." {
 					mess := temp.Results.Messages[0].Content
 					fmt.Println(mess)
-					to := evt.Info.SourceString()
+					to := evt.Info.Sender.User
 					zlog.Infof("%v --> %s\nBot --> %v", to, evt.Message.GetConversation(), mess)
 					zlog.Infof("-------------------------------")
 					fmt.Println(texting(to, mess))
