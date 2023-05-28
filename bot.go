@@ -17,7 +17,7 @@ const (
 
 func askBot(evt *events.Message) (*resp, error) {
 	payload := strings.NewReader(`{"message": {"content":"` + evt.Message.GetConversation() + `","type":"text"}, "conversation_id": "` + evt.Info.Sender.User + `"}`)
-	fmt.Println("payload ->", *payload)
+	// zLog.Info("payload ->", *payload)
 
 	req, err := http.NewRequest("POST", sapEndpoint, payload)
 	if err != nil {
@@ -40,7 +40,7 @@ func askBot(evt *events.Message) (*resp, error) {
 		var temp resp
 		err = json.Unmarshal(body, &temp)
 		if err != nil {
-			zlog.Infof("Error decoding body: %v\n", err)
+			return nil, err
 		}
 		return &temp, nil
 	}

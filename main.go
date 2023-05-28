@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -26,12 +27,13 @@ var (
 	now            = time.Now()
 	cli            *whatsmeow.Client
 	wLog           waLog.Logger
-	zlog           *zap.SugaredLogger
+	zLog           *zap.SugaredLogger
 	storeContainer *sqlstore.Container
 	logLevel       = "INFO"
 )
 
 func init() {
+	requestChannel = make(chan *events.Message, 10)
 	debugLogs := flag.Bool("debug", false, "Enable debug logs?")
 	dbDialect := flag.String("db-dialect", "sqlite3", "Database dialect (sqlite3 or postgres)")
 	dbAddress := flag.String("db-address", "file:db/examplestore.db?_foreign_keys=on", "Database address")
@@ -50,34 +52,24 @@ func init() {
 		return
 	}
 
-	cfg := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.InfoLevel),
-		Development: false,
-		Sampling: &zap.SamplingConfig{
-			Initial:    100,
-			Thereafter: 100,
-		},
-		Encoding:         "json",
-		EncoderConfig:    zap.NewProductionEncoderConfig(),
-		OutputPaths:      []string{"bot.log"},
-		ErrorOutputPaths: []string{"boterr.log"},
-	}
+	cfg := zap.NewProductionConfig()
+	cfg.OutputPaths = []string{"bot.log"}
+	cfg.ErrorOutputPaths = []string{"boterr.log"}
 	logger, _ := cfg.Build()
 	if err != nil {
 		panic(err)
 	}
 	logger.WithOptions(zap.AddCallerSkip(1))
 	defer logger.Sync() // flushes buffer, if any
-	zlog = logger.Sugar()
+	zLog = logger.Sugar()
 
 	err = godotenv.Load(".env")
 	if err != nil {
-		zlog.Fatalf("Some error occured. Err: %s", err)
+		zLog.Fatalf("Some error occured. Err: %s", err)
 	}
 }
 
 func main() {
-	fmt.Println("loaded env ", os.Getenv("SAP")) // remove this line
 	waBinary.IndentXML = true
 
 	device, err := storeContainer.GetFirstDevice()
@@ -117,24 +109,28 @@ func main() {
 		for {
 			evt, ok := <-requestChannel
 			if ok {
+				zLog.Infof("-------------------------------")
 				temp, err := askBot(evt)
 				if err != nil {
-					zlog.Infof("Error in post request: %v\n", err)
+					zLog.Infof("Error in post request: %v\n", err)
+					continue
 				}
 
 				if len(temp.Results.Messages) > 0 && temp.Results.Messages[0].Content != "I trigger the fallback skill because I don't understand or I don't know what I'm supposed to do..." {
 					mess := temp.Results.Messages[0].Content
-					fmt.Println(mess)
+					// zLog.Infof("Message: %s", mess)
 					to := evt.Info.Sender.User
-					zlog.Infof("%v --> %s\nBot --> %v", to, evt.Message.GetConversation(), mess)
-					zlog.Infof("-------------------------------")
-					fmt.Println(texting(to, mess))
+					zLog.Infof("%v --> %s\nBot --> %v", to, evt.Message.GetConversation(), mess)
+					zLog.Info(texting(to, mess))
+					zLog.Infof("-------------------------------")
 				}
 			}
 		}
 	}()
 
 	gin.SetMode(gin.ReleaseMode)
+	f, _ := os.Create("gin.log")
+	gin.DefaultWriter = io.MultiWriter(f)
 
 	router := gin.New()
 	router.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
@@ -156,6 +152,6 @@ func main() {
 	router.POST("/sendBulk", sendBulk)
 
 	if err := router.Run(":8080"); err != nil {
-		wLog.Infof("Shutdown with error: %v\n", err)
+		zLog.Infof("Shutdown with error: %v\n", err)
 	}
 }

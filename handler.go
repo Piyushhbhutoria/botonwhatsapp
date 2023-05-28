@@ -81,7 +81,7 @@ func handler(rawEvt interface{}) {
 
 			wLog.Infof("Received message %s from %s (%s): %s", evt.Info.ID, evt.Info.SourceString(), strings.Join(metaParts, ", "), message)
 
-			if evt.Info.Timestamp.After(now) && evt.Info.IsFromMe && !evt.Info.IsGroup && len(message) < 21 {
+			if evt.Info.Timestamp.After(now) && !evt.Info.IsFromMe && !evt.Info.IsGroup && len(message) < 21 { // TODO: update condition
 				requestChannel <- evt
 			}
 
