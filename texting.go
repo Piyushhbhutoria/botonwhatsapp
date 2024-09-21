@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -18,7 +18,7 @@ func texting(to, mess string) string {
 		return "User doesn't exist"
 	}
 
-	msg := &waProto.Message{Conversation: proto.String(mess)}
+	msg := &waE2E.Message{Conversation: proto.String(mess)}
 	ts, err := cli.SendMessage(context.Background(), recipient, msg)
 	var respstr string
 	if err != nil {

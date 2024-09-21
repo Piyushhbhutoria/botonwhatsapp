@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"go.mau.fi/whatsmeow"
-	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -31,14 +31,14 @@ func image(to, image, mess string) string {
 		wLog.Errorf("Failed to upload file: %v", err)
 		return "Error in uploading image"
 	}
-	msg := &waProto.Message{ImageMessage: &waProto.ImageMessage{
+	msg := &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
 		Caption:       proto.String(to),
-		Url:           proto.String(uploaded.URL),
+		URL:           proto.String(uploaded.URL),
 		DirectPath:    proto.String(uploaded.DirectPath),
 		MediaKey:      uploaded.MediaKey,
 		Mimetype:      proto.String(http.DetectContentType(data)),
-		FileEncSha256: uploaded.FileEncSHA256,
-		FileSha256:    uploaded.FileSHA256,
+		FileEncSHA256: uploaded.FileEncSHA256,
+		FileSHA256:    uploaded.FileSHA256,
 		FileLength:    proto.Uint64(uint64(len(data))),
 	}}
 	var respstr string
